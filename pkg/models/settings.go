@@ -1,35 +1,23 @@
 package models
 
-import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/grafana/grafana-plugin-sdk-go/backend"
-)
-
 type PluginSettings struct {
-	Path    string                `json:"path"`
-	Secrets *SecretPluginSettings `json:"-"`
+	ServiceUrl  string                `json:"serviceUrl"`
+	Secrets     *SecretPluginSettings `json:"-"`
+	Scopes      []string              `json:"-"`
+	ClientEmail string                `json:"clientEmail"`
+	TokenUri    string                `json:"tokenUri"`
+	PrivateKey  string                `json:"-"` // Assuming this should be secret
 }
 
 type SecretPluginSettings struct {
-	ApiKey string `json:"apiKey"`
+	ServiceAccountKey string `json:"serviceAccountKey"`
+	PrivateKey        string `json:"privateKey"`
 }
 
-func LoadPluginSettings(source backend.DataSourceInstanceSettings) (*PluginSettings, error) {
-	settings := PluginSettings{}
-	err := json.Unmarshal(source.JSONData, &settings)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal PluginSettings json: %w", err)
-	}
-
-	settings.Secrets = loadSecretPluginSettings(source.DecryptedSecureJSONData)
-
-	return &settings, nil
-}
-
+// Update loadSecretPluginSettings to include PrivateKey
 func loadSecretPluginSettings(source map[string]string) *SecretPluginSettings {
 	return &SecretPluginSettings{
-		ApiKey: source["apiKey"],
+		ServiceAccountKey: source["serviceAccountKey"],
+		PrivateKey:        source["privateKey"],
 	}
 }

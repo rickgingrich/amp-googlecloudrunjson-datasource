@@ -2,9 +2,14 @@ module github.com/amp/googlecloudrunjson-datasource
 
 go 1.21
 
-require github.com/grafana/grafana-plugin-sdk-go v0.251.0
+require (
+	github.com/grafana/grafana-google-sdk-go v0.2.2
+	github.com/grafana/grafana-plugin-sdk-go v0.251.0
+	golang.org/x/oauth2 v0.23.0
+)
 
 require (
+	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -90,3 +95,5 @@ require (
 	gopkg.in/fsnotify/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/grafana/grafana-google-sdk-go => github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241009201816-09012ad5a06c

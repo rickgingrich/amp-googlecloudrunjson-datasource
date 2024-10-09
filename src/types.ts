@@ -32,3 +32,19 @@ export interface MyDataSourceOptions extends DataSourceJsonData {
 export interface MySecureJsonData {
   apiKey?: string;
 }
+
+export interface MyDataSourceOptions {
+  serviceUrl: string;
+}
+
+export interface MySecureJsonData {
+  serviceAccountKey?: string;
+}
+
+export interface MyDataSourceOptions {
+  serviceUrl: string;
+}
+
+export interface MySecureJsonData {
+  serviceAccountKey?: string;
+}

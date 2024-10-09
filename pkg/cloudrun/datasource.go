@@ -1,4 +1,4 @@
-package plugin
+package cloudrun
 
 import (
 	"context"
@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/amp/googlecloudrunjson-datasource/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"github.com/amp/googlecloudrunjson-datasource/pkg/models"
+	"golang.org/x/oauth2/google"
 )
 
 // Make sure Datasource implements required interfaces. This is important to do
@@ -44,17 +45,25 @@ func (d *Datasource) Dispose() {
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	// create response struct
 	response := backend.NewQueryDataResponse()
 
-	// loop over queries and execute them individually.
-	for _, q := range req.Queries {
-		res := d.query(ctx, req.PluginContext, q)
-
-		// save the response in a hashmap
-		// based on with RefID as identifier
-		response.Responses[q.RefID] = res
+	// Create a Google Cloud client
+	config, err := google.JWTConfigFromJSON([]byte(d.settings.Secrets.ServiceAccountKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse service account key: %w", err)
 	}
+
+	client := config.Client(ctx)
+
+	// Make a request to your Cloud Run service
+	resp, err := client.Get(d.settings.ServiceUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Cloud Run service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Process the response and populate the Grafana response
+	// ...
 
 	return response, nil
 }

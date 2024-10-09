@@ -1,5 +1,5 @@
 import React, { ChangeEvent } from 'react';
-import { InlineField, Input, SecretInput } from '@grafana/ui';
+import { InlineField, Input, FileUpload } from '@grafana/ui';
 import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
 import { MyDataSourceOptions, MySecureJsonData } from '../types';
 
@@ -7,65 +7,55 @@ interface Props extends DataSourcePluginOptionsEditorProps<MyDataSourceOptions, 
 
 export function ConfigEditor(props: Props) {
   const { onOptionsChange, options } = props;
-  const { jsonData, secureJsonFields, secureJsonData } = options;
+  const { jsonData, secureJsonFields } = options;
+  const secureJsonData = (options.secureJsonData || {}) as MySecureJsonData;
 
-  const onPathChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onOptionsChange({
-      ...options,
-      jsonData: {
-        ...jsonData,
-        path: event.target.value,
-      },
-    });
+  const onServiceUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const jsonData = {
+      ...options.jsonData,
+      serviceUrl: event.target.value,
+    };
+    onOptionsChange({ ...options, jsonData });
   };
 
-  // Secure field (only sent to the backend)
-  const onAPIKeyChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onOptionsChange({
-      ...options,
-      secureJsonData: {
-        apiKey: event.target.value,
-      },
-    });
-  };
-
-  const onResetAPIKey = () => {
-    onOptionsChange({
-      ...options,
-      secureJsonFields: {
-        ...options.secureJsonFields,
-        apiKey: false,
-      },
-      secureJsonData: {
-        ...options.secureJsonData,
-        apiKey: '',
-      },
-    });
+  const onServiceAccountUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const serviceAccountKey = e.target?.result as string;
+      onOptionsChange({
+        ...options,
+        secureJsonData: {
+          ...secureJsonData,
+          serviceAccountKey,
+        },
+      });
+    };
+    if (event.target.files && event.target.files.length > 0) {
+      reader.readAsText(event.target.files[0]);
+    }
   };
 
   return (
     <>
-      <InlineField label="Path" labelWidth={14} interactive tooltip={'Json field returned to frontend'}>
+      <InlineField label="Cloud Run Service URL" labelWidth={24} tooltip="The URL of your Cloud Run service">
         <Input
-          id="config-editor-path"
-          onChange={onPathChange}
-          value={jsonData.path}
-          placeholder="Enter the path, e.g. /api/v1"
+          onChange={onServiceUrlChange}
+          value={jsonData.serviceUrl || ''}
+          placeholder="https://your-service-name-hash-region.a.run.app"
           width={40}
         />
       </InlineField>
-      <InlineField label="API Key" labelWidth={14} interactive tooltip={'Secure json field (backend only)'}>
-        <SecretInput
-          required
-          id="config-editor-api-key"
-          isConfigured={secureJsonFields.apiKey}
-          value={secureJsonData?.apiKey}
-          placeholder="Enter your API key"
-          width={40}
-          onReset={onResetAPIKey}
-          onChange={onAPIKeyChange}
-        />
+      <InlineField label="Service Account Key" labelWidth={24} tooltip="Upload your Google Cloud service account key JSON file">
+        <FileUpload
+          accept="application/json"
+          onFileUpload={onServiceAccountUpload}
+        >
+          Upload service account key
+        </FileUpload>
       </InlineField>
+      {secureJsonFields.serviceAccountKey && (
+        <div>Service account key is configured</div>
+      )}
     </>
   );
 }
