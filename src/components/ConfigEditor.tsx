@@ -25,6 +25,16 @@ export function ConfigEditor(props: Props) {
 
   const secureJsonData = (options.secureJsonData || {}) as MySecureJsonData;
 
+  const onServiceAccountKeyChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onOptionsChange({
+      ...options,
+      secureJsonData: {
+        ...secureJsonData,
+        serviceAccountKey: event.target.value,
+      },
+    });
+  };
+
   return (
     <div className="gf-form-group">
       <InlineField label="Service URL" labelWidth={12}>
@@ -43,7 +53,28 @@ export function ConfigEditor(props: Props) {
           width={40}
         />
       </InlineField>
-      {/* ... (rest of the JSX remains the same) */}
+      <InlineField label="Service Account Key" labelWidth={12}>
+        <SecretInput
+          isConfigured={(options.secureJsonFields && options.secureJsonFields.serviceAccountKey) || false}
+          value={secureJsonData.serviceAccountKey || ''}
+          placeholder="Paste your service account key JSON here"
+          width={40}
+          onReset={() => {
+            onOptionsChange({
+              ...options,
+              secureJsonFields: {
+                ...options.secureJsonFields,
+                serviceAccountKey: false,
+              },
+              secureJsonData: {
+                ...options.secureJsonData,
+                serviceAccountKey: '',
+              },
+            });
+          }}
+          onChange={onServiceAccountKeyChange}
+        />
+      </InlineField>
     </div>
   );
 }
