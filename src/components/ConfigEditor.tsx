@@ -1,15 +1,12 @@
 import React, { ChangeEvent } from 'react';
-import { InlineField, Input, FileUpload } from '@grafana/ui';
+import { InlineField, Input, SecretInput } from '@grafana/ui';
 import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
 import { MyDataSourceOptions, MySecureJsonData } from '../types';
 
-interface Props extends DataSourcePluginOptionsEditorProps<MyDataSourceOptions, MySecureJsonData> {}
+interface Props extends DataSourcePluginOptionsEditorProps<MyDataSourceOptions> {}
 
 export function ConfigEditor(props: Props) {
   const { onOptionsChange, options } = props;
-  const { jsonData, secureJsonFields } = options;
-  const secureJsonData = (options.secureJsonData || {}) as MySecureJsonData;
-
   const onServiceUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
     const jsonData = {
       ...options.jsonData,
@@ -18,44 +15,35 @@ export function ConfigEditor(props: Props) {
     onOptionsChange({ ...options, jsonData });
   };
 
-  const onServiceAccountUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const serviceAccountKey = e.target?.result as string;
-      onOptionsChange({
-        ...options,
-        secureJsonData: {
-          ...secureJsonData,
-          serviceAccountKey,
-        },
-      });
+  const onHealthCheckUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const jsonData = {
+      ...options.jsonData,
+      healthCheckUrl: event.target.value,
     };
-    if (event.target.files && event.target.files.length > 0) {
-      reader.readAsText(event.target.files[0]);
-    }
+    onOptionsChange({ ...options, jsonData });
   };
 
+  const secureJsonData = (options.secureJsonData || {}) as MySecureJsonData;
+
   return (
-    <>
-      <InlineField label="Cloud Run Service URL" labelWidth={24} tooltip="The URL of your Cloud Run service">
+    <div className="gf-form-group">
+      <InlineField label="Service URL" labelWidth={12}>
         <Input
           onChange={onServiceUrlChange}
-          value={jsonData.serviceUrl || ''}
-          placeholder="https://your-service-name-hash-region.a.run.app"
+          value={options.jsonData.serviceUrl || ''}
+          placeholder="https://your-cloud-run-service-url.com"
           width={40}
         />
       </InlineField>
-      <InlineField label="Service Account Key" labelWidth={24} tooltip="Upload your Google Cloud service account key JSON file">
-        <FileUpload
-          accept="application/json"
-          onFileUpload={onServiceAccountUpload}
-        >
-          Upload service account key
-        </FileUpload>
+      <InlineField label="Health Check URL" labelWidth={12}>
+        <Input
+          onChange={onHealthCheckUrlChange}
+          value={options.jsonData.healthCheckUrl || ''}
+          placeholder="https://your-cloud-run-service-url.com/health"
+          width={40}
+        />
       </InlineField>
-      {secureJsonFields.serviceAccountKey && (
-        <div>Service account key is configured</div>
-      )}
-    </>
+      {/* ... (rest of the JSX remains the same) */}
+    </div>
   );
 }

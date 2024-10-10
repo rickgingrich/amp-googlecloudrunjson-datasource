@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/grafana/grafana-google-sdk-go v0.2.2
 	github.com/grafana/grafana-plugin-sdk-go v0.251.0
-	golang.org/x/oauth2 v0.23.0
+	github.com/stretchr/testify v1.9.0
 )
 
 require (
@@ -18,6 +18,7 @@ require (
 	github.com/cheekybits/genny v1.0.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20220208224320-6efb837e6bc2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/elazarl/goproxy v0.0.0-20230731152917-f99041a5c027 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/getkin/kin-openapi v0.124.0 // indirect
@@ -60,6 +61,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.20.3 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
@@ -84,6 +86,7 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
@@ -96,4 +99,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/grafana/grafana-google-sdk-go => github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241009201816-09012ad5a06c
+replace github.com/grafana/grafana-google-sdk-go => github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241010013904-dccf975420da

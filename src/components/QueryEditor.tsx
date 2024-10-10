@@ -1,5 +1,5 @@
 import React, { ChangeEvent } from 'react';
-import { InlineField, Input, Stack } from '@grafana/ui';
+import { InlineField, Input, Select, TextArea } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
 import { DataSource } from '../datasource';
 import { MyDataSourceOptions, MyQuery } from '../types';
@@ -7,39 +7,53 @@ import { MyDataSourceOptions, MyQuery } from '../types';
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
 export function QueryEditor({ query, onChange, onRunQuery }: Props) {
-  const onQueryTextChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...query, queryText: event.target.value });
+  const onMethodChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    onChange({ ...query, Method: event.target.value });
   };
 
-  const onConstantChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...query, constant: parseFloat(event.target.value) });
-    // executes the query
-    onRunQuery();
+  const onPathChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange({ ...query, Path: event.target.value });
   };
 
-  const { queryText, constant } = query;
+  const onBodyChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    onChange({ ...query, Body: event.target.value });
+  };
+
+  const onQueryParamChange = (key: string, value: string) => {
+    const newParams = { ...query.Params, [key]: value };
+    onChange({ ...query, Params: newParams });
+  };
 
   return (
-    <Stack gap={0}>
-      <InlineField label="Constant">
-        <Input
-          id="query-editor-constant"
-          onChange={onConstantChange}
-          value={constant}
-          width={8}
-          type="number"
-          step="0.1"
+    <div>
+      <InlineField label="Request Type">
+        <Select
+          options={[
+            { label: 'GET', value: 'GET' },
+            { label: 'POST', value: 'POST' },
+            { label: 'PUT', value: 'PUT' },
+            { label: 'DELETE', value: 'DELETE' },
+          ]}
+          value={query.Method}
+          onChange={onMethodChange}
         />
       </InlineField>
-      <InlineField label="Query Text" labelWidth={16} tooltip="Not used yet">
-        <Input
-          id="query-editor-query-text"
-          onChange={onQueryTextChange}
-          value={queryText || ''}
-          required
-          placeholder="Enter a query"
-        />
+      <InlineField label="Resource Path">
+        <Input value={query.Path} onChange={onPathChange} />
       </InlineField>
-    </Stack>
+      <InlineField label="Request Body">
+        <TextArea value={query.Body} onChange={onBodyChange} />
+      </InlineField>
+      <InlineField label="Query Parameters">
+        {Object.entries(query.Params).map(([key, value]) => (
+          <div key={key}>
+            <Input value={key} onChange={(e) => onQueryParamChange(e.target.value, value)} />
+            <Input value={value} onChange={(e) => onQueryParamChange(key, e.target.value)} />
+          </div>
+        ))}
+        <button onClick={() => onQueryParamChange('', '')}>Add Query Param</button>
+      </InlineField>
+      <button onClick={onRunQuery}>Run Query</button>
+    </div>
   );
 }

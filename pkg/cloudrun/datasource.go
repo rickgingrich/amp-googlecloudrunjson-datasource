@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/amp/googlecloudrunjson-datasource/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"golang.org/x/oauth2/google"
 )
 
 // Make sure Datasource implements required interfaces. This is important to do
@@ -24,14 +26,35 @@ var (
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
 
-// NewDatasource creates a new datasource instance.
-func NewDatasource(_ context.Context, _ backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
-	return &Datasource{}, nil
-}
-
 // Datasource is an example datasource which can respond to data queries, reports
 // its health and has streaming skills.
-type Datasource struct{}
+type Datasource struct {
+	httpClient *http.Client
+	settings   *models.PluginSettings
+}
+
+// NewDatasource creates a new datasource instance.
+func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+	pluginSettings, err := models.LoadPluginSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	opts, err := settings.HTTPClientOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := newHTTPClient(*pluginSettings, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Datasource{
+		httpClient: client,
+		settings:   pluginSettings,
+	}, nil
+}
 
 // Dispose here tells plugin SDK that plugin wants to clean up resources when a new instance
 // created. As soon as datasource settings change detected by SDK old datasource instance will
@@ -47,75 +70,143 @@ func (d *Datasource) Dispose() {
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	response := backend.NewQueryDataResponse()
 
-	// Create a Google Cloud client
-	config, err := google.JWTConfigFromJSON([]byte(d.settings.Secrets.ServiceAccountKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse service account key: %w", err)
+	for _, q := range req.Queries {
+		res, err := d.query(ctx, q)
+		if err != nil {
+			return nil, err
+		}
+		response.Responses[q.RefID] = res
 	}
-
-	client := config.Client(ctx)
-
-	// Make a request to your Cloud Run service
-	resp, err := client.Get(d.settings.ServiceUrl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query Cloud Run service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Process the response and populate the Grafana response
-	// ...
 
 	return response, nil
 }
 
-type queryModel struct{}
+type queryModel struct {
+	Method string            `json:"Method"`
+	Path   string            `json:"Path"`
+	Body   string            `json:"Body"`
+	Params map[string]string `json:"Params"`
+}
 
-func (d *Datasource) query(_ context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
+func (d *Datasource) query(ctx context.Context, query backend.DataQuery) (backend.DataResponse, error) {
 	var response backend.DataResponse
-
-	// Unmarshal the JSON into our queryModel.
 	var qm queryModel
 
+	// Unmarshal the query JSON into our queryModel
 	err := json.Unmarshal(query.JSON, &qm)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("json unmarshal: %v", err.Error()))
+		return response, fmt.Errorf("error unmarshaling query: %w", err)
 	}
 
-	// create data frame response.
-	// For an overview on data frames and how grafana handles them:
-	// https://grafana.com/developers/plugin-tools/introduction/data-frames
+	_url := d.settings.ServiceUrl + qm.Path
+
+	// Add query parameters
+	if len(qm.Params) > 0 {
+		params := url.Values{}
+		for key, value := range qm.Params {
+			params.Add(key, value)
+		}
+		_url += "?" + params.Encode()
+	}
+
+	// Create a new request
+	var req *http.Request
+	if qm.Body != "" {
+		req, err = http.NewRequestWithContext(ctx, qm.Method, _url, strings.NewReader(qm.Body))
+	} else {
+		req, err = http.NewRequestWithContext(ctx, qm.Method, _url, nil)
+	}
+	if err != nil {
+		return response, fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	// Authentication headers will be added by the auth middleware
+
+	// Send the request
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return response, fmt.Errorf("error sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return response, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Check for non-200 status codes
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return response, fmt.Errorf("API returned non-OK status: %s, body: %s", resp.Status, string(body))
+	}
+
+	// Parse the JSON response
+	var result interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return response, fmt.Errorf("error parsing JSON response: %w", err)
+	}
+
+	// Create a data frame from the result
 	frame := data.NewFrame("response")
 
-	// add fields.
-	frame.Fields = append(frame.Fields,
-		data.NewField("time", nil, []time.Time{query.TimeRange.From, query.TimeRange.To}),
-		data.NewField("values", nil, []int64{10, 20}),
-	)
+	// Handle different response types
+	switch v := result.(type) {
+	case map[string]interface{}:
+		for key, value := range v {
+			frame.Fields = append(frame.Fields, data.NewField(key, nil, []interface{}{value}))
+		}
+	case []interface{}:
+		// Handle array responses
+		// This is a simplified example and may need to be adjusted based on your specific needs
+		for i, item := range v {
+			if m, ok := item.(map[string]interface{}); ok {
+				for key, value := range m {
+					frame.Fields = append(frame.Fields, data.NewField(fmt.Sprintf("%s_%d", key, i), nil, []interface{}{value}))
+				}
+			}
+		}
+	default:
+		return response, fmt.Errorf("unexpected response type")
+	}
 
-	// add the frames to the response.
+	// Add the frame to the response
 	response.Frames = append(response.Frames, frame)
 
-	return response
+	return response, nil
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.
-// The main use case for these health checks is the test button on the
-// datasource configuration page which allows users to verify that
-// a datasource is working as expected.
-func (d *Datasource) CheckHealth(_ context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	res := &backend.CheckHealthResult{}
-	config, err := models.LoadPluginSettings(*req.PluginContext.DataSourceInstanceSettings)
-
-	if err != nil {
-		res.Status = backend.HealthStatusError
-		res.Message = "Unable to load settings"
-		return res, nil
+func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
+	healthCheckUrl := d.settings.HealthCheckUrl
+	if healthCheckUrl == "" {
+		healthCheckUrl = d.settings.ServiceUrl
 	}
 
-	if config.Secrets.ApiKey == "" {
-		res.Status = backend.HealthStatusError
-		res.Message = "API key is missing"
-		return res, nil
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", healthCheckUrl, nil)
+	if err != nil {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusError,
+			Message: fmt.Sprintf("Error creating request: %v", err),
+		}, nil
+	}
+
+	resp, err := d.httpClient.Do(httpReq)
+	if err != nil {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusError,
+			Message: fmt.Sprintf("Error connecting to health check URL: %v", err),
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusError,
+			Message: fmt.Sprintf("Health check returned non-OK status: %s", resp.Status),
+		}, nil
 	}
 
 	return &backend.CheckHealthResult{

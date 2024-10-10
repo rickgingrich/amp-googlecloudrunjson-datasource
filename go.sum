@@ -184,8 +184,8 @@ github.com/prometheus/common v0.55.0 h1:KEi6DK7lXW/m7Ig5i47x0vRzuBsHuvJdi5ee6Y3G
 github.com/prometheus/common v0.55.0/go.mod h1:2SECS4xJG1kd8XF9IcM1gMX6510RAEL65zxzNImwdc8=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241009201816-09012ad5a06c h1:5PAvc99CeeDEG3vmCDrTro2PGWOg1Z1EFBXpBrM11oQ=
-github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241009201816-09012ad5a06c/go.mod h1:RiITSHwBhqVTTd3se3HQq5Ncs/wzzhTB9OK5N0J0PEU=
+github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241010013904-dccf975420da h1:5/5UGswLtDJj5ptQIlV6x5FzPka7It1WKtYLedZ3zQ0=
+github.com/rickgingrich/grafana-google-sdk-go v0.2.3-0.20241010013904-dccf975420da/go.mod h1:RiITSHwBhqVTTd3se3HQq5Ncs/wzzhTB9OK5N0J0PEU=
 github.com/rogpeppe/go-charset v0.0.0-20180617210344-2471d30d28b4/go.mod h1:qgYeAmZ5ZIpBWTGllZSQnw97Dj+woV0toclVaRGI8pc=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
