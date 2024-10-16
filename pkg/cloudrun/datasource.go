@@ -12,6 +12,7 @@ import (
 	"github.com/amp/googlecloudrunjson-datasource/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
 
@@ -67,16 +68,18 @@ func (d *Datasource) Dispose() {
 // req contains the queries []DataQuery (where each query contains RefID as a unique identifier).
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
+// QueryData handles multiple queries and returns multiple responses.
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	log.DefaultLogger.Info("QueryData called", "request", req)
+
 	response := backend.NewQueryDataResponse()
 
 	for _, q := range req.Queries {
-		res, err := d.query(ctx, q)
-		if err != nil {
-			return nil, err
-		}
+		res := d.query(ctx, req.PluginContext, q)
 		response.Responses[q.RefID] = res
 	}
+
+	log.DefaultLogger.Info("QueryData response", "response", response)
 
 	return response, nil
 }
@@ -88,15 +91,18 @@ type queryModel struct {
 	Params map[string]string `json:"Params"`
 }
 
-func (d *Datasource) query(ctx context.Context, query backend.DataQuery) (backend.DataResponse, error) {
+func (d *Datasource) query(ctx context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
 	var response backend.DataResponse
-	var qm queryModel
 
-	// Unmarshal the query JSON into our queryModel
+	// Unmarshal the JSON into our queryModel
+	var qm queryModel
 	err := json.Unmarshal(query.JSON, &qm)
 	if err != nil {
-		return response, fmt.Errorf("error unmarshaling query: %w", err)
+		log.DefaultLogger.Error("Error unmarshaling query", "error", err)
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("json unmarshal: %v", err.Error()))
 	}
+
+	log.DefaultLogger.Info("Query model", "model", qm)
 
 	_url := d.settings.ServiceUrl + qm.Path
 
@@ -117,7 +123,7 @@ func (d *Datasource) query(ctx context.Context, query backend.DataQuery) (backen
 		req, err = http.NewRequestWithContext(ctx, qm.Method, _url, nil)
 	}
 	if err != nil {
-		return response, fmt.Errorf("error creating request: %w", err)
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error creating request: %v", err.Error()))
 	}
 
 	// Set headers
@@ -127,55 +133,76 @@ func (d *Datasource) query(ctx context.Context, query backend.DataQuery) (backen
 	// Send the request
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return response, fmt.Errorf("error sending request: %w", err)
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error sending request: %v", err.Error()))
 	}
 	defer resp.Body.Close()
 
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return response, fmt.Errorf("error reading response body: %w", err)
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error reading response body: %v", err.Error()))
 	}
 
 	// Check for non-200 status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return response, fmt.Errorf("API returned non-OK status: %s, body: %s", resp.Status, string(body))
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("API returned non-OK status: %s, body: %s", resp.Status, string(body)))
 	}
 
 	// Parse the JSON response
-	var result interface{}
-	err = json.Unmarshal(body, &result)
+	var apiResponse struct {
+		Results []map[string]interface{} `json:"results"`
+	}
+	err = json.Unmarshal(body, &apiResponse)
 	if err != nil {
-		return response, fmt.Errorf("error parsing JSON response: %w", err)
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error parsing JSON response: %v", err.Error()))
 	}
 
 	// Create a data frame from the result
 	frame := data.NewFrame("response")
 
-	// Handle different response types
-	switch v := result.(type) {
-	case map[string]interface{}:
-		for key, value := range v {
-			frame.Fields = append(frame.Fields, data.NewField(key, nil, []interface{}{value}))
+	// Process the results
+	if len(apiResponse.Results) > 0 {
+		// Create fields based on the first result
+		for key := range apiResponse.Results[0] {
+			field := data.NewField(key, nil, []string{})
+			frame.Fields = append(frame.Fields, field)
 		}
-	case []interface{}:
-		// Handle array responses
-		// This is a simplified example and may need to be adjusted based on your specific needs
-		for i, item := range v {
-			if m, ok := item.(map[string]interface{}); ok {
-				for key, value := range m {
-					frame.Fields = append(frame.Fields, data.NewField(fmt.Sprintf("%s_%d", key, i), nil, []interface{}{value}))
+
+		// Add data to fields
+		for _, result := range apiResponse.Results {
+			for _, field := range frame.Fields {
+				value := result[field.Name]
+				var stringValue string
+				switch v := value.(type) {
+				case []interface{}:
+					// Convert slice to JSON string
+					jsonBytes, err := json.Marshal(v)
+					if err != nil {
+						return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error converting array to JSON: %v", err.Error()))
+					}
+					stringValue = string(jsonBytes)
+				case map[string]interface{}:
+					// Convert map to JSON string
+					jsonBytes, err := json.Marshal(v)
+					if err != nil {
+						return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error converting map to JSON: %v", err.Error()))
+					}
+					stringValue = string(jsonBytes)
+				default:
+					// Convert any other type to string
+					stringValue = fmt.Sprintf("%v", v)
 				}
+				field.Append(stringValue)
 			}
 		}
-	default:
-		return response, fmt.Errorf("unexpected response type")
 	}
 
 	// Add the frame to the response
 	response.Frames = append(response.Frames, frame)
 
-	return response, nil
+	log.DefaultLogger.Info("Query response", "response", response)
+
+	return response
 }
 
 // CheckHealth handles health checks sent from Grafana to the plugin.

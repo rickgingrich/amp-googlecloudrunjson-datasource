@@ -1,26 +1,25 @@
-import { DataSourceInstanceSettings, CoreApp, ScopedVars } from '@grafana/data';
-import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-
-import { MyQuery, MyDataSourceOptions, DEFAULT_QUERY } from './types';
+import { DataSourceInstanceSettings, DataQueryResponse} from '@grafana/data';
+import { DataSourceWithBackend } from '@grafana/runtime';
+import { MyQuery, MyDataSourceOptions } from './types';
+import { Observable, tap } from 'rxjs';
 
 export class DataSource extends DataSourceWithBackend<MyQuery, MyDataSourceOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<MyDataSourceOptions>) {
     super(instanceSettings);
   }
 
-  getDefaultQuery(_: CoreApp): Partial<MyQuery> {
-    return DEFAULT_QUERY;
+  query(request: any): Observable<DataQueryResponse> {
+    console.log('Query method called with request:', request);
+    return super.query(request).pipe(
+      tap(
+        (response: DataQueryResponse) => console.log('Query response:', response),
+        (error: any) => console.error('Query error:', error)
+      )
+    );
   }
 
-  applyTemplateVariables(query: MyQuery, scopedVars: ScopedVars) {
-    return {
-      ...query,
-      queryText: getTemplateSrv().replace(query.queryText, scopedVars),
-    };
-  }
-
-  filterQuery(query: MyQuery): boolean {
-    // if no query has been provided, prevent the query from being executed
-    return !!query.queryText;
+  testDatasource() {
+    console.log('TestDatasource method called');
+    return super.testDatasource();
   }
 }

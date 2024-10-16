@@ -1,4 +1,5 @@
-import { DataSourceJsonData, DataQuery } from '@grafana/data';
+import { DataSourceJsonData } from '@grafana/data';
+import { DataQuery } from '@grafana/schema';
 
 export interface MyQuery extends DataQuery {
   Method: string;
@@ -16,6 +17,7 @@ export const DEFAULT_QUERY: Partial<MyQuery> = {
 
 export interface MyDataSourceOptions extends DataSourceJsonData {
   serviceUrl: string;
+  healthCheckUrl?: string;
 }
 
 export interface MySecureJsonData {
