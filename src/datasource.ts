@@ -1,25 +1,43 @@
-import { DataSourceInstanceSettings, DataQueryResponse} from '@grafana/data';
-import { DataSourceWithBackend } from '@grafana/runtime';
+import {
+  DataSourceInstanceSettings,
+  DataQueryRequest,
+  DataQueryResponse,
+  ScopedVars
+} from '@grafana/data';
+import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { Observable } from 'rxjs';
 import { MyQuery, MyDataSourceOptions } from './types';
-import { Observable, tap } from 'rxjs';
 
 export class DataSource extends DataSourceWithBackend<MyQuery, MyDataSourceOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<MyDataSourceOptions>) {
     super(instanceSettings);
   }
 
-  query(request: any): Observable<DataQueryResponse> {
-    console.log('Query method called with request:', request);
-    return super.query(request).pipe(
-      tap(
-        (response: DataQueryResponse) => console.log('Query response:', response),
-        (error: any) => console.error('Query error:', error)
-      )
-    );
-  }
+  query(options: DataQueryRequest<MyQuery>): Observable<DataQueryResponse> {
+    const templateSrv = getTemplateSrv();
+    const queries = options.targets.map(target => {
+      const query = { ...target };
+      
+      // Use ScopedVars when replacing variables
+      const scopedVars: ScopedVars = { ...options.scopedVars };
+      
+      if (query.Body) {
+        query.Body = templateSrv.replace(query.Body, scopedVars);
+      }
 
-  testDatasource() {
-    console.log('TestDatasource method called');
-    return super.testDatasource();
+      if (query.Path) {
+        query.Path = templateSrv.replace(query.Path, scopedVars);
+      }
+
+      if (query.Params) {
+        Object.keys(query.Params).forEach(key => {
+          query.Params![key] = templateSrv.replace(query.Params![key], scopedVars);
+        });
+      }
+
+      return query;
+    });
+
+    return super.query({ ...options, targets: queries });
   }
 }

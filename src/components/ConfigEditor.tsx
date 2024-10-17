@@ -37,7 +37,7 @@ export function ConfigEditor(props: Props) {
 
   return (
     <div className="gf-form-group">
-      <InlineField label="Service URL" labelWidth={12}>
+      <InlineField label="Service URL" labelWidth={20}>
         <Input
           onChange={onServiceUrlChange}
           value={options.jsonData.serviceUrl || ''}
@@ -45,7 +45,7 @@ export function ConfigEditor(props: Props) {
           width={40}
         />
       </InlineField>
-      <InlineField label="Health Check URL" labelWidth={12}>
+      <InlineField label="Health Check URL" labelWidth={20}>
         <Input
           onChange={onHealthCheckUrlChange}
           value={options.jsonData.healthCheckUrl || ''}
@@ -53,7 +53,7 @@ export function ConfigEditor(props: Props) {
           width={40}
         />
       </InlineField>
-      <InlineField label="Service Account Key" labelWidth={12}>
+      <InlineField label="Service Account Key" labelWidth={20}>
         <SecretInput
           isConfigured={(options.secureJsonFields && options.secureJsonFields.serviceAccountKey) || false}
           value={secureJsonData.serviceAccountKey || ''}

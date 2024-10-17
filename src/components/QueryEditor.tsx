@@ -1,5 +1,5 @@
 import React, { ChangeEvent } from 'react';
-import { InlineField, Input, Select, TextArea, Button } from '@grafana/ui';
+import { InlineField, Input, Select, Button, CodeEditor } from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
 import { MyDataSourceOptions, MyQuery, DEFAULT_QUERY } from '../types';
@@ -17,40 +17,25 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
   ];
 
   const onMethodChange = (option: SelectableValue<string>) => {
-    const newQuery = { ...actualQuery, Method: option.value || 'GET' };
-    onChange(newQuery);
-    console.log('Method changed:', newQuery);
+    onChange({ ...actualQuery, Method: option.value || 'GET' });
   };
 
   const onPathChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const newQuery = { ...actualQuery, Path: event.target.value };
-    onChange(newQuery);
-    console.log('Path changed:', newQuery);
+    onChange({ ...actualQuery, Path: event.target.value });
   };
 
-  const onBodyChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    const newQuery = { ...actualQuery, Body: event.target.value };
-    onChange(newQuery);
-    console.log('Body changed:', newQuery);
+  const onBodyChange = (value: string) => {
+    onChange({ ...actualQuery, Body: value });
   };
 
   const onQueryParamChange = (key: string, value: string) => {
     const newParams = { ...actualQuery.Params, [key]: value };
-    const newQuery = { ...actualQuery, Params: newParams };
-    onChange(newQuery);
-    console.log('Query params changed:', newQuery);
+    onChange({ ...actualQuery, Params: newParams });
   };
 
   const addQueryParam = () => {
     const newParams = { ...actualQuery.Params, '': '' };
-    const newQuery = { ...actualQuery, Params: newParams };
-    onChange(newQuery);
-    console.log('Query param added:', newQuery);
-  };
-
-  const runQuery = () => {
-    console.log('Run Query clicked. Current query:', actualQuery);
-    onRunQuery();
+    onChange({ ...actualQuery, Params: newParams });
   };
 
   return (
@@ -64,24 +49,32 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
         />
       </InlineField>
       <InlineField label="Resource Path" labelWidth={14}>
-        <Input value={actualQuery.Path} onChange={onPathChange} width={40} />
+        <Input value={actualQuery.Path || ''} onChange={onPathChange} width={40} />
       </InlineField>
-      <InlineField label="Request Body" labelWidth={14}>
-        <TextArea value={actualQuery.Body} onChange={onBodyChange} rows={4} width={40} />
+      <InlineField label="Request Body" labelWidth={14} grow>
+        <CodeEditor
+          value={actualQuery.Body || ''}
+          language="json"
+          showMiniMap={false}
+          showLineNumbers={true}
+          height="200px"
+          width="100%"
+          onBlur={onBodyChange}
+        />
       </InlineField>
       <InlineField label="Query Parameters" labelWidth={14}>
         <div>
-          {Object.entries(actualQuery.Params).map(([key, value], index) => (
+          {Object.entries(actualQuery.Params || {}).map(([key, value], index) => (
             <div key={index} style={{ marginBottom: '8px' }}>
               <Input
                 value={key}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onQueryParamChange(e.target.value, value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => onQueryParamChange(e.target.value, value)}
                 placeholder="Key"
                 width={20}
               />
               <Input
                 value={value}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onQueryParamChange(e.target.value, value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => onQueryParamChange(key, e.target.value)}
                 placeholder="Value"
                 width={20}
               />
@@ -92,7 +85,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
           </Button>
         </div>
       </InlineField>
-      <Button onClick={runQuery} variant="primary">
+      <Button onClick={onRunQuery} variant="primary">
         Run Query
       </Button>
     </div>

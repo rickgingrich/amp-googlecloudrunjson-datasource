@@ -2,10 +2,10 @@ import { DataSourceJsonData } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
 
 export interface MyQuery extends DataQuery {
-  Method: string;
-  Path: string;
-  Body: string;
-  Params: { [key: string]: string };
+  Method?: string;
+  Path?: string;
+  Body?: string;
+  Params?: { [key: string]: string };
 }
 
 export const DEFAULT_QUERY: Partial<MyQuery> = {

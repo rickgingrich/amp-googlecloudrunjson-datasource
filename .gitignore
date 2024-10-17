@@ -25,6 +25,7 @@ dist/
 artifacts/
 work/
 ci/
+plugins/
 
 # e2e test directories
 /test-results/
