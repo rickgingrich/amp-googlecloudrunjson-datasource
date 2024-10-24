@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useCallback, useState } from 'react';
+import React, { ChangeEvent, useCallback, useState, useMemo } from 'react';
 import { InlineField, Input, Select, Button, CodeEditor } from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
@@ -10,13 +10,13 @@ type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 export function QueryEditor({ query, onChange, onRunQuery }: Props) {
   const [localQuery, setLocalQuery] = useState<MyQuery>(query);
 
-  const debouncedOnChange = useCallback(
-    debounce((newQuery: MyQuery) => {
+  const debouncedOnChange = useMemo(
+    () => debounce((newQuery: MyQuery) => {
       onChange(newQuery);
     }, 500),
     [onChange]
   );
-
+  
   const updateQuery = useCallback((updater: (q: MyQuery) => Partial<MyQuery>) => {
     setLocalQuery((prevQuery) => {
       const newQuery = { ...prevQuery, ...updater(prevQuery) };
