@@ -1,4 +1,4 @@
-module github.com/amp/googlecloudrunjson-datasource
+module github.com/amp/grafana-cloudrunjson-datasource
 
 go 1.21
 

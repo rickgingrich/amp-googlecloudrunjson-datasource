@@ -1,7 +1,7 @@
 services:
   grafana:
     user: root
-    container_name: 'amp-googlecloudrunjson-datasource'
+    container_name: 'grafana-cloudrunjson-datasource'
 
     build:
       context: ./.config
@@ -18,12 +18,14 @@ services:
     cap_add:
       - SYS_PTRACE
     volumes:
-      - ./plugins:/var/lib/grafana/plugins
+      - ./dist:/var/lib/grafana/plugins/grafana-cloudrunjson-datasource
       - ./provisioning:/etc/grafana/provisioning
-      - .:/root/amp-googlecloudrunjson-datasource
+      - .:/root/grafana-cloudrunjson-datasource
 
     environment:
       NODE_ENV: development
       GF_LOG_LEVEL: info
       GF_DATAPROXY_LOGGING: 1
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: amp-googlecloudrunjson-datasource
+      GF_DATAPROXY_TIMEOUT: 900
+      GF_DATAPROXY_KEEP_ALIVE_SECONDS: 900
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: grafana-cloudrunjson-datasource

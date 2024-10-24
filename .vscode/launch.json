@@ -23,7 +23,7 @@
       "substitutePath": [
         {
           "from": "${workspaceFolder}",
-          "to": "/root/amp-googlecloudrunjson-datasource"
+          "to": "/root/grafana-cloudrunjson-datasource"
         }
       ]
     }

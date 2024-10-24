@@ -1,70 +1,94 @@
-import React, { ChangeEvent } from 'react';
+import React, { ChangeEvent, useCallback, useState } from 'react';
 import { InlineField, Input, Select, Button, CodeEditor } from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
-import { MyDataSourceOptions, MyQuery, DEFAULT_QUERY } from '../types';
+import { MyDataSourceOptions, MyQuery } from '../types';
+import debounce from 'lodash/debounce';
 
 type Props = QueryEditorProps<DataSource, MyQuery, MyDataSourceOptions>;
 
 export function QueryEditor({ query, onChange, onRunQuery }: Props) {
-  const actualQuery = { ...DEFAULT_QUERY, ...query };
+  const [localQuery, setLocalQuery] = useState<MyQuery>(query);
 
-  const methodOptions: Array<SelectableValue<string>> = [
-    { label: 'GET', value: 'GET' },
-    { label: 'POST', value: 'POST' },
-    { label: 'PUT', value: 'PUT' },
-    { label: 'DELETE', value: 'DELETE' },
-  ];
+  const debouncedOnChange = useCallback(
+    debounce((newQuery: MyQuery) => {
+      onChange(newQuery);
+    }, 500),
+    [onChange]
+  );
+
+  const updateQuery = useCallback((updater: (q: MyQuery) => Partial<MyQuery>) => {
+    setLocalQuery((prevQuery) => {
+      const newQuery = { ...prevQuery, ...updater(prevQuery) };
+      debouncedOnChange(newQuery);
+      return newQuery;
+    });
+  }, [debouncedOnChange]);
 
   const onMethodChange = (option: SelectableValue<string>) => {
-    onChange({ ...actualQuery, Method: option.value || 'GET' });
+    updateQuery((q) => ({ ...q, Method: option.value || 'GET' }));
   };
 
   const onPathChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...actualQuery, Path: event.target.value });
+    updateQuery((q) => ({ ...q, Path: event.target.value }));
   };
 
   const onBodyChange = (value: string) => {
-    onChange({ ...actualQuery, Body: value });
+    updateQuery((q) => ({ ...q, Body: value }));
   };
 
   const onQueryParamChange = (key: string, value: string) => {
-    const newParams = { ...actualQuery.Params, [key]: value };
-    onChange({ ...actualQuery, Params: newParams });
+    updateQuery((q) => ({
+      ...q,
+      Params: { ...q.Params, [key]: value },
+    }));
   };
 
   const addQueryParam = () => {
-    const newParams = { ...actualQuery.Params, '': '' };
-    onChange({ ...actualQuery, Params: newParams });
+    updateQuery((q) => ({
+      ...q,
+      Params: { ...q.Params, '': '' },
+    }));
+  };
+
+  const handleRunQuery = () => {
+    onChange(localQuery);
+    onRunQuery();
   };
 
   return (
     <div>
       <InlineField label="Request Type">
         <Select
-          options={methodOptions}
-          value={methodOptions.find(option => option.value === actualQuery.Method)}
+          options={[
+            { label: 'GET', value: 'GET' },
+            { label: 'POST', value: 'POST' },
+            { label: 'PUT', value: 'PUT' },
+            { label: 'DELETE', value: 'DELETE' },
+            { label: 'PATCH', value: 'PATCH' },
+          ]}
+          value={localQuery.Method}
           onChange={onMethodChange}
           width={20}
         />
       </InlineField>
       <InlineField label="Resource Path" labelWidth={14}>
-        <Input value={actualQuery.Path || ''} onChange={onPathChange} width={40} />
+        <Input value={localQuery.Path || ''} onChange={onPathChange} width={40} />
       </InlineField>
       <InlineField label="Request Body" labelWidth={14} grow>
         <CodeEditor
-          value={actualQuery.Body || ''}
+          value={localQuery.Body || ''}
           language="json"
           showMiniMap={false}
           showLineNumbers={true}
           height="200px"
           width="100%"
-          onBlur={onBodyChange}
+          onBlur={(value) => onBodyChange(value)}
         />
       </InlineField>
       <InlineField label="Query Parameters" labelWidth={14}>
         <div>
-          {Object.entries(actualQuery.Params || {}).map(([key, value], index) => (
+          {Object.entries(localQuery.Params || {}).map(([key, value], index) => (
             <div key={index} style={{ marginBottom: '8px' }}>
               <Input
                 value={key}
@@ -85,7 +109,7 @@ export function QueryEditor({ query, onChange, onRunQuery }: Props) {
           </Button>
         </div>
       </InlineField>
-      <Button onClick={onRunQuery} variant="primary">
+      <Button onClick={handleRunQuery} variant="primary">
         Run Query
       </Button>
     </div>

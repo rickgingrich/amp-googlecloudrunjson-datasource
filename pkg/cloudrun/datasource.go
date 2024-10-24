@@ -1,15 +1,16 @@
 package cloudrun
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
+	"time"
 
-	"github.com/amp/googlecloudrunjson-datasource/pkg/models"
+	"github.com/amp/grafana-cloudrunjson-datasource/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
@@ -36,6 +37,7 @@ type Datasource struct {
 
 // NewDatasource creates a new datasource instance.
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+
 	pluginSettings, err := models.LoadPluginSettings(settings)
 	if err != nil {
 		return nil, err
@@ -45,6 +47,10 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	if err != nil {
 		return nil, err
 	}
+
+	// Set a longer timeout
+	opts.Timeouts.Timeout = 600 * time.Second
+	opts.Timeouts.KeepAlive = 600 * time.Second
 
 	client, err := newHTTPClient(*pluginSettings, opts)
 	if err != nil {
@@ -70,8 +76,11 @@ func (d *Datasource) Dispose() {
 // contains Frames ([]*Frame).
 // QueryData handles multiple queries and returns multiple responses.
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	log.DefaultLogger.Info("QueryData called", "request", req)
-
+	logSafeReq := *req
+	logSafeReq.PluginContext.DataSourceInstanceSettings.DecryptedSecureJSONData = map[string]string{}
+	for k := range req.PluginContext.DataSourceInstanceSettings.DecryptedSecureJSONData {
+		logSafeReq.PluginContext.DataSourceInstanceSettings.DecryptedSecureJSONData[k] = "[REDACTED]"
+	}
 	response := backend.NewQueryDataResponse()
 
 	for _, q := range req.Queries {
@@ -87,12 +96,14 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 type queryModel struct {
 	Method string            `json:"Method"`
 	Path   string            `json:"Path"`
-	Body   string            `json:"Body"`
+	Body   json.RawMessage   `json:"Body"`
 	Params map[string]string `json:"Params"`
 }
 
 func (d *Datasource) query(ctx context.Context, pCtx backend.PluginContext, query backend.DataQuery) backend.DataResponse {
 	var response backend.DataResponse
+
+	log.DefaultLogger.Info("Query", "query", query)
 
 	// Unmarshal the JSON into our queryModel
 	var qm queryModel
@@ -115,10 +126,12 @@ func (d *Datasource) query(ctx context.Context, pCtx backend.PluginContext, quer
 		_url += "?" + params.Encode()
 	}
 
+	log.DefaultLogger.Info("Constructed URL", "url", _url)
+
 	// Create a new request
 	var req *http.Request
-	if qm.Body != "" {
-		req, err = http.NewRequestWithContext(ctx, qm.Method, _url, strings.NewReader(qm.Body))
+	if len(qm.Body) > 2 {
+		req, err = http.NewRequestWithContext(ctx, qm.Method, _url, bytes.NewReader(qm.Body))
 	} else {
 		req, err = http.NewRequestWithContext(ctx, qm.Method, _url, nil)
 	}
@@ -129,6 +142,8 @@ func (d *Datasource) query(ctx context.Context, pCtx backend.PluginContext, quer
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	// Authentication headers will be added by the auth middleware
+
+	log.DefaultLogger.Info("Sending request", "method", req.Method, "url", req.URL.String(), "body", string(qm.Body))
 
 	// Send the request
 	resp, err := d.httpClient.Do(req)
@@ -143,33 +158,37 @@ func (d *Datasource) query(ctx context.Context, pCtx backend.PluginContext, quer
 		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error reading response body: %v", err.Error()))
 	}
 
+	// Check if the response body is empty
+	if len(body) == 0 || string(body) == "[]" {
+		log.DefaultLogger.Warn("Received empty response body")
+		return response
+	}
+
 	// Check for non-200 status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("API returned non-OK status: %s, body: %s", resp.Status, string(body)))
 	}
 
 	// Parse the JSON response
-	var apiResponse struct {
-		Results []map[string]interface{} `json:"results"`
-	}
+	var apiResponse []map[string]interface{}
 	err = json.Unmarshal(body, &apiResponse)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error parsing JSON response: %v", err.Error()))
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("error parsing JSON response: %v, body: %s", err.Error(), string(body)))
 	}
 
 	// Create a data frame from the result
 	frame := data.NewFrame("response")
 
 	// Process the results
-	if len(apiResponse.Results) > 0 {
+	if len(apiResponse) > 0 {
 		// Create fields based on the first result
-		for key := range apiResponse.Results[0] {
+		for key := range apiResponse[0] {
 			field := data.NewField(key, nil, []string{})
 			frame.Fields = append(frame.Fields, field)
 		}
 
 		// Add data to fields
-		for _, result := range apiResponse.Results {
+		for _, result := range apiResponse {
 			for _, field := range frame.Fields {
 				value := result[field.Name]
 				var stringValue string

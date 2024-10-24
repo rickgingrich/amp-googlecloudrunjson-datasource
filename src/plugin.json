@@ -1,15 +1,15 @@
 {
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "datasource",
-  "name": "Googlecloudrunjson-Datasource",
-  "id": "amp-googlecloudrunjson-datasource",
+  "name": "Cloud Run JSON API Datasource",
+  "id": "grafana-cloudrunjson-datasource",
   "metrics": true,
   "backend": true,
-  "executable": "gpx_googlecloudrunjson_datasource",
+  "executable": "gpx_cloudrunjson_datasource",
   "info": {
     "description": "",
     "author": {
-      "name": "Amp"
+      "name": "AMP Data Platforms"
     },
     "keywords": ["datasource"],
     "logos": {

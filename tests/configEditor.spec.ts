@@ -1,26 +1,39 @@
 import { test, expect } from '@grafana/plugin-e2e';
 import { MyDataSourceOptions, MySecureJsonData } from '../src/types';
 
-test('"Save & test" should be successful when configuration is valid', async ({
+test('Configuration editor should handle valid input', async ({
   createDataSourceConfigPage,
-  readProvisionedDataSource,
   page,
 }) => {
-  const ds = await readProvisionedDataSource<MyDataSourceOptions, MySecureJsonData>({ fileName: 'datasources.yml' });
-  const configPage = await createDataSourceConfigPage({ type: ds.type });
-  await page.getByRole('textbox', { name: 'Path' }).fill(ds.jsonData.path ?? '');
-  await page.getByRole('textbox', { name: 'API Key' }).fill(ds.secureJsonData?.apiKey ?? '');
+  const configPage = await createDataSourceConfigPage({
+    type: 'grafana-cloudrunjson-datasource',
+  });
+
+  // Fill in the configuration fields
+  await page.getByLabel('Service URL').fill('https://example-service.run.app');
+  await page.getByLabel('Health Check URL').fill('https://example-service.run.app/health');
+  await page.getByLabel('Service Account Key').fill('{"type": "service_account", "project_id": "test-project"}');
+
+  // Save and test the configuration
   await expect(configPage.saveAndTest()).toBeOK();
 });
 
-test('"Save & test" should fail when configuration is invalid', async ({
+test('Configuration editor should handle invalid input', async ({
   createDataSourceConfigPage,
-  readProvisionedDataSource,
   page,
 }) => {
-  const ds = await readProvisionedDataSource<MyDataSourceOptions, MySecureJsonData>({ fileName: 'datasources.yml' });
-  const configPage = await createDataSourceConfigPage({ type: ds.type });
-  await page.getByRole('textbox', { name: 'Path' }).fill(ds.jsonData.path ?? '');
+  const configPage = await createDataSourceConfigPage({
+    type: 'grafana-cloudrunjson-datasource',
+  });
+
+  // Fill in invalid configuration (missing required field)
+  await page.getByLabel('Service URL').fill('https://example-service.run.app');
+  // Intentionally leave Health Check URL empty
+  await page.getByLabel('Service Account Key').fill('{"type": "service_account", "project_id": "test-project"}');
+
+  // Attempt to save and test the configuration
   await expect(configPage.saveAndTest()).not.toBeOK();
-  await expect(configPage).toHaveAlert('error', { hasText: 'API key is missing' });
+
+  // Check for error message
+  await expect(page.getByText('Health Check URL is required')).toBeVisible();
 });

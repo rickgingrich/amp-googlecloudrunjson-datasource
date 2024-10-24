@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/amp/googlecloudrunjson-datasource/pkg/cloudrun"
+	"github.com/amp/grafana-cloudrunjson-datasource/pkg/cloudrun"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 )
 
-const pluginId = "amp-googlecloudrunjson-datasource"
+const pluginId = "grafana-cloudrunjson-datasource"
 
 func main() {
 	// Start listening to requests sent from Grafana. This call is blocking so
