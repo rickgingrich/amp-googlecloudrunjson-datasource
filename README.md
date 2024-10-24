@@ -82,4 +82,10 @@ Once you have the token, you can sign the plugin by running the following comman
 export GRAFANA_ACCESS_POLICY_TOKEN=[YOUR_ACCESS_POLICY_TOKEN]
 npx @grafana/sign-plugin@latest --rootUrls https://grafana.amprobotics.com
 ```
+# Installing the Plugin
+
+After building and signing the plugin, you can install it in Grafana by following the instructions in [Install a plugin on local grafana](https://grafana.com/docs/grafana/latest/administration/plugin-management/#install-plugin-on-local-grafana).
+
+For the AMP Grafana instance, you will need to copy the plugin to the pod (using `kubectl cp` or equivalent), unzip into the plugins directory, and restart the pod.
+
 
